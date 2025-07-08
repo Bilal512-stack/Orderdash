@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
 import { ShoppingCart, CreditCard, Users, Calendar, Package } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import StatusChart from '../components/StatusChart';
 import OrdersTable from '../components/OrdersTable';
-import { useSocket } from '../hooks/SocketContext'; // 👈 import du hook socket
-
 interface Stats {
   ventes: { total: number; pourcentage: number; periode: string };
   commandes: { total: number; pourcentage: number; periode: string };
@@ -28,78 +25,35 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { socket } = useSocket('http://localhost:5000');
 
   const fetchDashboardData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Token non trouvé.');
-        setError('Token manquant. Veuillez vous reconnecter.');
-        setLoading(false);
-        return;
-      }
+  try {
+    const [statsRes, ordersRes] = await Promise.all([
+      api.get<Stats>('/stats'),
+      api.get<any[]>('/orders'),
+    ]);
 
-      const [statsRes, ordersRes] = await Promise.all([
-        axios.get<Stats>('http://localhost:5000/api/stats', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get<any[]>('http://localhost:5000/api/orders', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
-
-      setStats(statsRes.data);
-      setOrders(
-        ordersRes.data
-          .map((order) => ({
-            id: order._id,
-            senderName: order.pickup?.senderName || 'Expéditeur inconnu',
-            recipientName: order.delivery?.recipientName || 'Destinataire inconnu',
-            date: order.createdAt || new Date().toISOString(),
-            status: order.status || 'En attente',
-            montant: order.montant || 0,
-          }))
-          .reverse()
-      );
-      setError(null);
-    } catch (err) {
-      console.error('Erreur chargement dashboard:', err);
-      setError('Erreur lors du chargement du dashboard.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  // 🎯 Mise en place des listeners socket
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('newOrderNotification', (data) => {
-      console.log('🆕 Nouvelle commande :', data);
-      fetchDashboardData();
-    });
-
-    socket.on('orderUpdated', (data) => {
-      console.log('✏️ Commande mise à jour :', data);
-      fetchDashboardData();
-    });
-
-    socket.on('orderDeleted', (data) => {
-      console.log('🗑️ Commande supprimée :', data);
-      fetchDashboardData();
-    });
-
-    return () => {
-      socket.off('newOrderNotification');
-      socket.off('orderUpdated');
-      socket.off('orderDeleted');
-    };
-  }, [socket]);
+    setStats(statsRes.data);
+    setOrders(
+      ordersRes.data
+        .map((order) => ({
+          id: order._id,
+          senderName: order.pickup?.senderName || 'Expéditeur inconnu',
+          recipientName: order.delivery?.recipientName || 'Destinataire inconnu',
+          date: order.createdAt || new Date().toISOString(),
+          status: order.status || 'En attente',
+          montant: order.montant || 0,
+        }))
+        .reverse()
+    );
+    setError(null);
+  } catch (err) {
+    console.error('Erreur chargement dashboard:', err);
+    setError('Erreur lors du chargement du dashboard.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (loading) return <div className="p-4">Chargement...</div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;
