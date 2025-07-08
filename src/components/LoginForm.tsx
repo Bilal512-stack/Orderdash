@@ -12,19 +12,19 @@ export default function LoginForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      interface LoginResponse {
-        token: string;
-        // add other fields if needed
-      }
-      const res = await axios.post<LoginResponse>('http://localhost:5000/api/admin/login', { email, password });
-      localStorage.setItem('token', res.data.token);
-      console.log('Token stocké dans localStorage:', localStorage.getItem('token'));
-      alert('Connexion réussie, token stocké !');
+      const res = await axios.post('https://mta-backend-production-1342.up.railway.app/api/admin/login', {
+        email,
+        password,
+      });
 
-      // Redirection vers le dashboard après la connexion réussie
-      navigate('/'); // Redirection vers le dashboard
-    } catch (error) {
-      console.error('Erreur de connexion :', error);
+      const token = res.data.token;
+      localStorage.setItem('token', token);
+      console.log('✅ Token stocké :', token);
+
+      // ✅ Redirection vers le dashboard principal (homepage)
+      navigate('/Dashboard');
+    } catch (error: any) {
+      console.error('❌ Erreur de connexion :', error);
       alert('Email ou mot de passe incorrect.');
     } finally {
       setLoading(false);
