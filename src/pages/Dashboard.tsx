@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShoppingCart, CreditCard, Users, Calendar, Package } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import StatusChart from '../components/StatusChart';
 import OrdersTable from '../components/OrdersTable';
+import api from '../axiosConfig';
+import socket from '../socket';
+
 interface Stats {
   ventes: { total: number; pourcentage: number; periode: string };
   commandes: { total: number; pourcentage: number; periode: string };
@@ -25,43 +28,69 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-
   const fetchDashboardData = async () => {
-  try {
-    const [statsRes, ordersRes] = await Promise.all([
-      api.get<Stats>('/stats'),
-      api.get<any[]>('/orders'),
-    ]);
+    try {
+      const [statsRes, ordersRes] = await Promise.all([
+        api.get<Stats>('/stats'),
+        api.get<any[]>('/orders'),
+      ]);
 
-    setStats(statsRes.data);
-    setOrders(
-      ordersRes.data
-        .map((order) => ({
-          id: order._id,
-          senderName: order.pickup?.senderName || 'Expéditeur inconnu',
-          recipientName: order.delivery?.recipientName || 'Destinataire inconnu',
-          date: order.createdAt || new Date().toISOString(),
-          status: order.status || 'En attente',
-          montant: order.montant || 0,
-        }))
-        .reverse()
-    );
-    setError(null);
-  } catch (err) {
-    console.error('Erreur chargement dashboard:', err);
-    setError('Erreur lors du chargement du dashboard.');
-  } finally {
-    setLoading(false);
-  }
-};
+      setStats(statsRes.data);
+      setOrders(
+        ordersRes.data
+          .map((order) => ({
+            id: order._id,
+            senderName: order.pickup?.senderName || 'Expéditeur inconnu',
+            recipientName: order.delivery?.recipientName || 'Destinataire inconnu',
+            date: order.createdAt || new Date().toISOString(),
+            status: order.status || 'En attente',
+            montant: order.montant || 0,
+          }))
+          .reverse()
+      );
+      setError(null);
+    } catch (err) {
+      console.error('Erreur chargement dashboard:', err);
+      setError('Erreur lors du chargement du dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    if (!socket) return;
+
+    socket.on('connect', () => {
+      console.log('✅ Socket connecté :', socket.id);
+    });
+
+    socket.on('newOrderNotification', () => {
+      console.log('📦 Nouvelle commande reçue');
+      fetchDashboardData();
+    });
+
+    socket.on('orderUpdated', () => {
+      console.log('✏️ Commande mise à jour');
+      fetchDashboardData();
+    });
+
+    socket.on('orderDeleted', () => {
+      console.log('🗑️ Commande supprimée');
+      fetchDashboardData();
+    });
+
+    return () => {
+      socket.off('newOrderNotification');
+      socket.off('orderUpdated');
+      socket.off('orderDeleted');
+    };
+  }, []);
 
   if (loading) return <div className="p-4">Chargement...</div>;
   if (error) return <div className="p-4 text-red-600">{error}</div>;
   if (!stats) return <div className="p-4 text-red-600">Impossible de charger les statistiques.</div>;
-
-  const refreshDashboard = () => {
-    fetchDashboardData();
-  };
 
   const recentOrders = orders.slice(0, 5);
 
@@ -144,7 +173,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div>
-        <OrdersTable orders={orders} refreshDashboard={refreshDashboard} />
+        <OrdersTable orders={orders} refreshDashboard={fetchDashboardData} />
       </div>
     </div>
   );

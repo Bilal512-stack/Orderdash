@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../axiosConfig';
+import socket from '../socket';
 import { Order } from '../types';
 import OrderStatusTag from './OrderStatusTag';
 import { Search, Filter, ChevronDown } from 'lucide-react';
@@ -20,8 +21,6 @@ const OrdersTable: React.FC = () => {
     setError(null);
 
     const token = localStorage.getItem('token');
-    console.log('Token récupéré depuis localStorage dans fetchOrders:', token);
-
     if (!token) {
       setLoading(false);
       alert('Aucun token trouvé, veuillez vous connecter.');
@@ -29,13 +28,9 @@ const OrdersTable: React.FC = () => {
     }
 
     try {
-      const response = await axios.get('http://localhost:5000/api/orders', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await api.get('/api/orders', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      console.log('Réponse backend :', response.data);
 
       if (Array.isArray(response.data)) {
         setOrders(response.data);
@@ -56,10 +51,29 @@ const OrdersTable: React.FC = () => {
     fetchOrders();
   }, []);
 
-  // Protection : Si orders n’est pas un tableau
-  if (!Array.isArray(orders)) {
-    return <p className="text-red-500">Erreur : les données reçues ne sont pas valides.</p>;
-  }
+  useEffect(() => {
+    const onOrderUpdated = (updatedOrder: Order) => {
+      setOrders(prev => {
+        const idx = prev.findIndex(o => o._id === updatedOrder._id);
+        if (idx === -1) return prev;
+        const newOrders = [...prev];
+        newOrders[idx] = updatedOrder;
+        return newOrders;
+      });
+    };
+
+    const onOrderCreated = (newOrder: Order) => {
+      setOrders(prev => [newOrder, ...prev]);
+    };
+
+    socket.on('orderUpdated', onOrderUpdated);
+    socket.on('orderCreated', onOrderCreated);
+
+    return () => {
+      socket.off('orderUpdated', onOrderUpdated);
+      socket.off('orderCreated', onOrderCreated);
+    };
+  }, []);
 
   const filteredOrders = orders.filter((order) => {
     const searchText = searchTerm.toLowerCase();
@@ -88,7 +102,7 @@ const OrdersTable: React.FC = () => {
         return;
       }
 
-      const res = await axios.post(`http://localhost:5000/api/assign-order/${orderId}`, {}, {
+      const res = await api.post(`/api/assign-order/${orderId}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -108,7 +122,6 @@ const OrdersTable: React.FC = () => {
 
   if (loading) return <p>Chargement des commandes...</p>;
   if (error) return <p className="text-red-500">{error}</p>;
-
  return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-center gap-4">

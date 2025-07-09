@@ -7,25 +7,25 @@ interface OrderStatusTagProps {
 const OrderStatusTag: React.FC<OrderStatusTagProps> = ({ status }) => {
   const getStatusConfig = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'en attente':
+      case 'En attente':
         return {
           label: 'En attente',
           bgColor: 'bg-yellow-100',
           textColor: 'text-yellow-800',
         };
-      case 'assignée':
+      case 'Assignée':
         return {
           label: 'Assignée',
           bgColor: 'bg-blue-100',
           textColor: 'text-blue-800',
         };
-      case 'en cours':
+      case 'En cours':
         return {
           label: 'En cours',
           bgColor: 'bg-purple-100',
           textColor: 'text-purple-800',
         };
-      case 'livrée':
+      case 'Livrée':
         return {
           label: 'Livrée',
           bgColor: 'bg-green-100',

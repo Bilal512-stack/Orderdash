@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Truck } from 'lucide-react';
 import CarrierCard from '../components/CarrierCard';
 import AddCarrierModal from '../components/AddCarrierModal';
+import api from '../axiosConfig'; // ✅ Axios config
+import socket from '../socket'; // ✅ Socket partagé global
 
 interface Route {
   from: string;
@@ -17,7 +19,7 @@ interface Transporter {
   name: string;
   phone: string;
   email?: string;
-  password?: string; // ✅ pour AddCarrierModal (non affiché)
+  password?: string;
   truckType: string;
   licensePlate?: string;
   truckCapacity?: number;
@@ -41,8 +43,8 @@ const Carriers: React.FC = () => {
 
   const fetchTransporters = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/transporters');
-      const data = await response.json();
+      const response = await api.get('/transporters');
+      const data = response.data;
 
       if (Array.isArray(data)) {
         setCarriers(data);
@@ -58,17 +60,40 @@ const Carriers: React.FC = () => {
 
   useEffect(() => {
     fetchTransporters();
+
+    if (!socket) return;
+
+    // ✅ Écoute des événements socket
+    socket.on('transporterAdded', (newCarrier: Transporter) => {
+      setCarriers((prev) => [newCarrier, ...prev]);
+    });
+
+    socket.on('transporterUpdated', (updated: Transporter) => {
+      setCarriers((prev) =>
+        prev.map((carrier) => (carrier._id === updated._id ? updated : carrier))
+      );
+    });
+
+    socket.on('transporterDeleted', (deletedId: string) => {
+      setCarriers((prev) => prev.filter((carrier) => carrier._id !== deletedId));
+    });
+
+    return () => {
+      socket.off('transporterAdded');
+      socket.off('transporterUpdated');
+      socket.off('transporterDeleted');
+    };
   }, []);
 
   const handleAvailabilityChange = (id: string, newStatus: boolean) => {
-    setCarriers(prev =>
-      prev.map(carrier =>
+    setCarriers((prev) =>
+      prev.map((carrier) =>
         carrier._id === id ? { ...carrier, isAvailable: newStatus } : carrier
       )
     );
   };
 
-  const availableCarriers = carriers.filter(c => c.isAvailable);
+  const availableCarriers = carriers.filter((c) => c.isAvailable);
 
   return (
     <div className="space-y-6">
@@ -89,35 +114,13 @@ const Carriers: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center justify-center md:flex-row md:justify-between">
-          <div className="flex flex-col items-center md:items-start">
-            <p className="text-gray-500 text-sm">Total transporteurs</p>
-            <h2 className="text-3xl font-bold text-gray-800">{carriers.length}</h2>
-          </div>
-          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mt-2 md:mt-0">
-            <Truck size={24} className="text-blue-600" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center justify-center md:flex-row md:justify-between">
-          <div className="flex flex-col items-center md:items-start">
-            <p className="text-gray-500 text-sm">Transporteurs actifs</p>
-            <h2 className="text-3xl font-bold text-green-600">{availableCarriers.length}</h2>
-          </div>
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mt-2 md:mt-0">
-            <Truck size={24} className="text-green-600" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center justify-center md:flex-row md:justify-between">
-          <div className="flex flex-col items-center md:items-start">
-            <p className="text-gray-500 text-sm">Transporteurs inactifs</p>
-            <h2 className="text-3xl font-bold text-red-600">{carriers.length - availableCarriers.length}</h2>
-          </div>
-          <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mt-2 md:mt-0">
-            <Truck size={24} className="text-red-600" />
-          </div>
-        </div>
+        <StatCard title="Total transporteurs" value={carriers.length} color="blue" />
+        <StatCard title="Transporteurs actifs" value={availableCarriers.length} color="green" />
+        <StatCard
+          title="Transporteurs inactifs"
+          value={carriers.length - availableCarriers.length}
+          color="red"
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -134,3 +137,32 @@ const Carriers: React.FC = () => {
 };
 
 export default Carriers;
+
+// Helper StatCard
+const StatCard = ({
+  title,
+  value,
+  color,
+}: {
+  title: string;
+  value: number;
+  color: 'blue' | 'green' | 'red';
+}) => {
+  const colorMap = {
+    blue: 'text-blue-600 bg-blue-100',
+    green: 'text-green-600 bg-green-100',
+    red: 'text-red-600 bg-red-100',
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center justify-center md:flex-row md:justify-between">
+      <div className="flex flex-col items-center md:items-start">
+        <p className="text-gray-500 text-sm">{title}</p>
+        <h2 className={`text-3xl font-bold ${colorMap[color].split(' ')[0]}`}>{value}</h2>
+      </div>
+      <div className={`w-12 h-12 ${colorMap[color].split(' ')[1]} rounded-full flex items-center justify-center mt-2 md:mt-0`}>
+        <Truck size={24} className={colorMap[color].split(' ')[0]} />
+      </div>
+    </div>
+  );
+};

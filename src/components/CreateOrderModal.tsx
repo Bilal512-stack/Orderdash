@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../axiosConfig';
+import socket from '../hooks/SocketContext';
 
 interface CreateOrderModalProps {
   onClose: () => void;
@@ -26,56 +27,62 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onOrderCre
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  // Validation poids/distance
-  const weightNum = parseFloat(formData.weight);
-  const distanceNum = parseFloat(formData.distance);
-  if (isNaN(weightNum) || weightNum <= 0) {
-    alert('Poids invalide');
-    return;
-  }
-  if (isNaN(distanceNum) || distanceNum <= 0) {
-    alert('Distance invalide');
-    return;
-  }
+    const weightNum = parseFloat(formData.weight);
+    const distanceNum = parseFloat(formData.distance);
 
-  const token = localStorage.getItem('token');
-  if (!token) {
-    alert('Token manquant');
-    return;
-  }
+    if (isNaN(weightNum) || weightNum <= 0) {
+      alert('Poids invalide');
+      return;
+    }
 
-  try {
-    const payload = {
-      pickup: {
-        senderName: formData.senderName,
-        senderPhone: formData.senderPhone,
-        address: formData.senderAddress,
-      },
-      delivery: {
-        recipientName: formData.recipientName,
-        recipientPhone: formData.recipientPhone,
-        address: formData.recipientAddress,
-      },
-      truckType: formData.truckType,
-      weight: weightNum,
-      distance: distanceNum,
-      nature: formData.nature,
-    };
+    if (isNaN(distanceNum) || distanceNum <= 0) {
+      alert('Distance invalide');
+      return;
+    }
 
-    const response = await axios.post('http://localhost:5000/api/orders', payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Token manquant');
+      return;
+    }
 
-    alert("Commande créée avec succès");
-    onOrderCreated();
-    onClose();
-  } catch (err: any) {
-    alert(err.response?.data?.error || "Erreur création commande");
-  }
-};
+    try {
+      const payload = {
+        pickup: {
+          senderName: formData.senderName,
+          senderPhone: formData.senderPhone,
+          address: formData.senderAddress,
+        },
+        delivery: {
+          recipientName: formData.recipientName,
+          recipientPhone: formData.recipientPhone,
+          address: formData.recipientAddress,
+        },
+        truckType: formData.truckType,
+        weight: weightNum,
+        distance: distanceNum,
+        nature: formData.nature,
+      };
 
+      const response = await api.post('/orders', payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const createdOrder = response.data;
+
+      // ✅ Notifie les dashboards/admins connectés en temps réel
+      socket.emit('newOrderCreated', createdOrder);
+
+      alert('Commande créée avec succès');
+      onOrderCreated();
+      onClose();
+    } catch (err: any) {
+      console.error('Erreur création commande :', err);
+      alert(err?.response?.data?.error || 'Erreur lors de la création de la commande');
+    }
+  };
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
       <form

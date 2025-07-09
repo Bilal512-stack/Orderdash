@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Menu, Bell } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
+import socket from '../socket'; // ✅ Socket partagé
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -19,27 +19,23 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<Socket | null>(null);
 
-  // Connecter socket.io une fois au montage
+  // ✅ Écoute socket.io pour recevoir les notifications
   useEffect(() => {
-    const socket = io('http://localhost:5173'); // adapte l'URL si besoin
-    socketRef.current = socket;
+    if (!socket) return;
 
-    // Écoute de l'événement notification envoyé par le serveur
     socket.on('newOrderNotification', (notif: OrderNotification) => {
       console.log('🔔 Nouvelle notification reçue:', notif);
-      setNotifications(prev => [notif, ...prev]);
-      setNotificationCount(prev => prev + 1);
+      setNotifications((prev) => [notif, ...prev]);
+      setNotificationCount((prev) => prev + 1);
     });
 
-    // Cleanup à la destruction du composant
     return () => {
-      socket.disconnect();
+      socket.off('newOrderNotification');
     };
   }, []);
 
-  // Gérer fermeture dropdown au clic extérieur
+  // ✅ Fermer dropdown si clic en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -50,7 +46,7 @@ const Header: React.FC<HeaderProps> = ({ setSidebarOpen }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Quand on clique sur la cloche, toggle dropdown et reset compteur
+  // ✅ Clic sur cloche → toggle + reset compteur
   const handleBellClick = () => {
     setOpen(!open);
     setNotificationCount(0);

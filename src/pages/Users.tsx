@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import UsersTable from '../components/UsersTable';
 import { UserPlus, Users as UsersIcon } from 'lucide-react';
+import UsersTable from '../components/UsersTable';
 import CreateUserModal from '../components/CreateUserModal';
+import api from '../axiosConfig';
 
 interface User {
   _id: string;
@@ -23,28 +23,31 @@ const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-const fetchUsers = async () => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    console.error('Token manquant dans localStorage');
-    return;
-  }
-  try {
-    const response = await axios.get<User[]>('http://localhost:5000/api/users', {
-      headers: {
-        Authorization: `Bearer ${token}`,  // <-- bien mettre ici
-      },
-    });
-    setUsers(response.data);
-  } catch (error) {
-    console.error('Erreur lors du chargement des utilisateurs :', error);
-  }
-};
+  const fetchUsers = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('Token manquant dans localStorage');
+      return;
+    }
+    try {
+      const response = await api.get<User[]>('/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des utilisateurs :', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const handleOpenModal = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
 
   const handleUserCreated = () => {
-    fetchUsers(); // Recharger les utilisateurs
+    fetchUsers(); // recharge la liste après ajout
     handleCloseModal();
   };
 
@@ -92,7 +95,7 @@ const fetchUsers = async () => {
 
 export default Users;
 
-// Composant réutilisable pour les stats
+// ✅ Composant StatCard réutilisable
 const StatCard = ({
   title,
   count,

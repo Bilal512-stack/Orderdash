@@ -6,9 +6,12 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-  async (config) => {
+  (config) => {
     const token = localStorage.getItem('token');
     if (token) {
+      if (!config.headers) {
+        config.headers = {};
+      }
       config.headers.Authorization = `Bearer ${token}`;
     } else {
       console.warn('⚠️ Aucun token trouvé dans axiosConfig');

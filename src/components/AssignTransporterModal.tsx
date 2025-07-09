@@ -1,72 +1,82 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog } from '@headlessui/react';
 import { X } from 'lucide-react';
-
+import api from '../axiosConfig';
+import socket from '../socket';
 
 interface Props {
-isOpen: boolean;
-onClose: () => void;
-order: {
+  isOpen: boolean;
+  onClose: () => void;
+  order: {
     _id: string;
     senderAddress: string;
     recipientAddress: string;
-    // Ajoute d'autres propriétés si nécessaire
-};
-onAssigned?: () => void;
+    // Autres propriétés si besoin
+  };
+  onAssigned?: () => void;
+}
+
+interface Transporter {
+  _id: string;
+  name: string;
+  phone: string;
+  isAvailable: boolean;
+  routes?: { from: string; to: string }[];
 }
 
 const AssignTransporterModal: React.FC<Props> = ({ isOpen, onClose, order, onAssigned }) => {
-interface Transporter {
-_id: string;
-name: string;
-phone: string;
-isAvailable: boolean;
-routes?: { from: string; to: string }[];
-}
+  const [transporters, setTransporters] = useState<Transporter[]>([]);
+  const [loading, setLoading] = useState(false);
 
-const [transporters, setTransporters] = useState<Transporter[]>([]);
-const [loading, setLoading] = useState(false);
-
-  // Filtrer les transporteurs compatibles
-useEffect(() => {
+  // 👉 Chargement des transporteurs compatibles
+  useEffect(() => {
     const fetchTransporters = async () => {
-    const res = await fetch('http://localhost:5000/api/transporters');
-    const data = await res.json();
+      try {
+        const res = await api.get('/transporters');
+        const data = res.data;
 
-    const compatibles = (data as Transporter[]).filter((t: Transporter) =>
-        t.isAvailable &&
-        t.routes?.some((r: { from: string; to: string }) =>
-        r.from.toLowerCase() === order.senderAddress.toLowerCase() &&
-        r.to.toLowerCase() === order.recipientAddress.toLowerCase()
-        )
-    );
+        const compatibles = data.filter((t: Transporter) =>
+          t.isAvailable &&
+          t.routes?.some((r) =>
+            r.from.toLowerCase() === order.senderAddress.toLowerCase() &&
+            r.to.toLowerCase() === order.recipientAddress.toLowerCase()
+          )
+        );
 
-    setTransporters(compatibles);
+        setTransporters(compatibles);
+      } catch (err) {
+        console.error('Erreur chargement transporteurs:', err);
+      }
     };
 
     if (isOpen) fetchTransporters();
-}, [isOpen, order]);
+  }, [isOpen, order]);
 
-const handleAssign = async (transporterId: string) => {
-  try {
-    setLoading(true);
-    const res = await fetch(`http://localhost:5000/api/assign-order/${order._id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transporterId }),
-    });
+  // 👉 Assignation de la commande à un transporteur
+  const handleAssign = async (transporterId: string) => {
+    try {
+      setLoading(true);
+      const res = await api.post(`/assign-order/${order._id}`, { transporterId });
 
-    if (!res.ok) throw new Error('Erreur lors de l’assignation');
-    if (onAssigned) onAssigned();
-    onClose();
-  } catch (err) {
-    console.error(err);
-    alert('Échec de l’assignation');
-  } finally {
-    setLoading(false);
-  }
-};
+      if (res.status === 200) {
+        // ✅ Notify other clients
+        socket.emit('orderAssigned', {
+          orderId: order._id,
+          transporterId,
+        });
 
+        if (onAssigned) onAssigned();
+        onClose();
+      } else {
+        throw new Error('Échec assignation');
+      }
+    } catch (err) {
+      console.error('Erreur assignation:', err);
+      alert("Erreur lors de l'assignation.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
 return (
     <Dialog open={isOpen} onClose={onClose} className="fixed z-50 inset-0 overflow-y-auto">

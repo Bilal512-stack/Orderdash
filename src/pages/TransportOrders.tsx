@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
 import { OTDownloadButton } from '../components/OTDocument';
+import api from '../axiosConfig';
+import socket from '../socket';
 
 interface Order {
   pickup: {
@@ -21,6 +22,39 @@ interface Order {
   montant?: number;
 }
 
+interface GeneratedOT {
+  orderId: string | undefined;
+  createdAt: string;
+  sender: {
+    name: string;
+    address: string;
+    phone: string;
+  };
+  recipient: {
+    name: string;
+    address: string;
+    phone: string;
+  };
+  nature: string;
+  weight: number;
+  volume: number | null;
+  transportMode: string;
+  route: {
+    from: string;
+    to: string;
+  };
+  estimatedByClient: number;
+  agreedPrice: number;
+  shippingDate: string;
+  loadingDate: string;
+  loadingHour: string;
+  deliveryDate: string;
+  deliveryHour: string;
+  commitments: string;
+  paymentConditions: string;
+  notes: string;
+}
+
 export default function TransportOrders() {
   const { orderId } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
@@ -35,66 +69,26 @@ export default function TransportOrders() {
   const [paymentConditions, setPaymentConditions] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
-
-  interface GeneratedOT {
-    orderId: string | undefined;
-    createdAt: string;
-    sender: {
-      name: string;
-      address: string;
-      phone: string;
-    };
-    recipient: {
-      name: string;
-      address: string;
-      phone: string;
-    };
-    nature: string;
-    weight: number;
-    volume: number | null;
-    transportMode: string;
-    route: {
-      from: string;
-      to: string;
-    };
-    estimatedByClient: number;
-    agreedPrice: number;
-    shippingDate: string;
-    loadingDate: string;
-    loadingHour: string;
-    deliveryDate: string;
-    deliveryHour: string;
-    commitments: string;
-    paymentConditions: string;
-    notes: string;
-  }
-
   const [generatedOT, setGeneratedOT] = useState<GeneratedOT | null>(null);
 
-  // 🔗 Chargement de la commande depuis le backend
   useEffect(() => {
-    if (orderId) {
-      const fetchOrder = async () => {
-        try {
-          const token = localStorage.getItem('token');
-          console.log('🔑 Token utilisé:', token);
+    if (!orderId) return;
 
-          const response = await axios.get(`http://localhost:5000/api/orders/${orderId}`, {
-            headers: { Authorization: token ? `Bearer ${token}` : '' }
-          });
+    const fetchOrder = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await api.get(`/orders/${orderId}`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+        });
+        setOrder(res.data);
+      } catch (err) {
+        console.error('Erreur chargement commande:', err);
+      }
+    };
 
-          console.log('📦 Commande récupérée:', response.data);
-          setOrder(response.data);
-        } catch (error) {
-          console.error('❌ Erreur lors du chargement de la commande:', error);
-        }
-      };
-
-      fetchOrder();
-    }
+    fetchOrder();
   }, [orderId]);
 
-  // 🔗 Création de l'Ordre de Transport
   const handleSubmit = async () => {
     if (!order || !agreedPrice || !shippingDate) {
       alert('Veuillez remplir tous les champs obligatoires.');
@@ -104,7 +98,6 @@ export default function TransportOrders() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-
       const otData: GeneratedOT = {
         orderId,
         createdAt: new Date().toLocaleDateString('fr-FR'),
@@ -138,17 +131,18 @@ export default function TransportOrders() {
         notes
       };
 
-      console.log('📄 Données OT à envoyer:', otData);
-
-      await axios.post('http://localhost:5000/api/transport-orders', otData, {
+      await api.post('/transport-orders', otData, {
         headers: { Authorization: token ? `Bearer ${token}` : '' }
       });
+
+      // 📢 Émettre un événement au backend pour mettre à jour la dashboard en temps réel
+      socket.emit('orderAssigned', { orderId });
 
       alert('Ordre de Transport créé avec succès.');
       setGeneratedOT(otData);
     } catch (err) {
-      console.error('❌ Erreur lors de la création de l\'OT:', err);
-      alert("Erreur lors de la création de l'OT.");
+      console.error('Erreur création OT:', err);
+      alert("Erreur lors de la création de l'Ordre de Transport.");
     } finally {
       setLoading(false);
     }
@@ -159,7 +153,9 @@ export default function TransportOrders() {
 
   return (
     <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-lg p-8 mt-10 space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">Ordre de Transport – Commande #{orderId}</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        Ordre de Transport – Commande #{orderId}
+      </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -195,7 +191,7 @@ export default function TransportOrders() {
 
       <div>
         <label className="text-sm font-medium">Engagements du transporteur</label>
-        <textarea value={commitments} onChange={e => setCommitments(e.target.value)} rows={4} className="w-full border px-3 py-2 rounded" placeholder="Respect des horaires, propreté, sécurité..."></textarea>
+        <textarea value={commitments} onChange={e => setCommitments(e.target.value)} rows={4} className="w-full border px-3 py-2 rounded" placeholder="Respect des horaires, propreté, sécurité..." />
       </div>
 
       <div>
@@ -205,7 +201,7 @@ export default function TransportOrders() {
 
       <div>
         <label className="text-sm font-medium">Notes / Conditions spéciales</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full border px-3 py-2 rounded"></textarea>
+        <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full border px-3 py-2 rounded" />
       </div>
 
       <button onClick={handleSubmit} disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">

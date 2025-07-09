@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { Dialog } from '@headlessui/react';
+import api from '../axiosConfig';
+import socket from '../socket';
 
 interface Props {
   isOpen: boolean;
@@ -100,25 +102,22 @@ const AddCarrierModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/transporters', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.post('/transporters', formData);
 
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || 'Erreur ajout transporteur');
-
-      console.log('✅ Transporteur ajouté', data);
-      resetForm();
-      if (onSuccess) onSuccess();
-      onClose();
+      if (response.status === 201 || response.status === 200) {
+        const newCarrier = response.data;
+        socket.emit('transporterAdded', newCarrier); // ✅ notification live
+        if (onSuccess) onSuccess();
+        resetForm();
+        onClose();
+      } else {
+        alert('Erreur serveur : transporteur non ajouté');
+      }
     } catch (err: any) {
-      console.error('❌ Erreur front :', err.message);
+      console.error('Erreur lors de la création :', err);
+      alert(err?.response?.data?.error || 'Erreur serveur.');
     }
   };
-
   return (
     <Dialog open={isOpen} onClose={onClose} className="fixed z-50 inset-0 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4">

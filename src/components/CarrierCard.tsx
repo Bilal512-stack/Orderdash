@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Phone, Mail, Truck, Clock, BadgeCheck, GaugeCircle, MapPin, Package } from 'lucide-react';
-import axios from 'axios';
+import api from '../axiosConfig';
+import socket from '../socket';
 
 interface Route {
   from: string;
@@ -14,15 +15,15 @@ interface Vehicle {
 interface Carrier {
   _id: string;
   name: string;
-  phone: string; // corrigé en string
+  phone: string;
   email?: string;
   licensePlate?: string;
   truckCapacity?: number;
   isAvailable: boolean;
   currentorderId: string;
-  lastActive?: string; // ISO string
-  routes?: Route[]; // ajouté
-  vehicles?: Vehicle[]; // ajout si tu utilises vehicles
+  lastActive?: string;
+  routes?: Route[];
+  vehicles?: Vehicle[];
 }
 
 interface Props {
@@ -35,29 +36,29 @@ const CarrierCard: React.FC<Props> = ({ carrier, onAvailabilityChange }) => {
   const [loading, setLoading] = useState(false);
 
   const handleToggleAvailability = async () => {
-  setLoading(true);
-  try {
-    // Remplace par l'URL de ton API directement pour test
-    const apiBaseUrl = 'http://localhost:5000'; // ou ta vraie URL de prod
+    setLoading(true);
+    try {
+      const res = await api.patch(`/transporters/${carrier._id}/availability`, {
+        isAvailable: !isAvailable,
+      });
 
-    const res = await axios.patch(
-  `${apiBaseUrl}/api/transporters/${carrier._id}/availability`,
-  { isAvailable: !isAvailable }
-);
+      const newStatus = res.data.transporter.isAvailable;
+      setIsAvailable(newStatus);
+      onAvailabilityChange(carrier._id, newStatus);
 
+      // ✅ Notifie seulement le dashboard admin et le transporteur concerné
+      socket.emit('transporterAvailabilityChanged', {
+        transporterId: carrier._id,
+        isAvailable: newStatus,
+      });
 
-    const data = res.data as { transporter: { isAvailable: boolean } };
-    const newStatus = data.transporter.isAvailable;
-    setIsAvailable(newStatus);
-    onAvailabilityChange(carrier._id, newStatus);
-  } catch (error) {
-    console.error('❌ Erreur mise à jour dispo :', error);
-    alert("Erreur lors de la mise à jour de la disponibilité");
-  } finally {
-    setLoading(false);
-  }
-};
-
+    } catch (error) {
+      console.error('❌ Erreur mise à jour dispo :', error);
+      alert("Erreur lors de la mise à jour de la disponibilité.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!carrier) return null;
 

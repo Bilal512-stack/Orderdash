@@ -4,10 +4,12 @@ import StatusChart from '../components/StatusChart';
 import { Calendar, PackageCheck } from 'lucide-react';
 import CreateOrderModal from '../components/CreateOrderModal';
 import dayjs from 'dayjs';
+import api from '../axiosConfig';
+import socket from '../socket';
 
 export interface Order {
   clientId: string;
-  date: string; // format ISO
+  date: string;
   montant: number;
   status: 'En_attente' | 'Assignée' | 'En_cours' | 'Livrée' | 'Annulée';
   recipientAddress: string;
@@ -48,46 +50,39 @@ const Orders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-
-      if (!token) {
-        console.warn('Pas de token trouvé dans localStorage !');
-        return;
-      }
-
-      const response = await fetch('http://localhost:5000/api/orders', {
-        method: 'GET',
+      const res = await api.get('/orders', {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : '',
         },
       });
-
-      if (!response.ok) {
-        console.error('Erreur HTTP:', response.status, response.statusText);
-        const errorData = await response.json().catch(() => null);
-        console.error('Détails erreur serveur:', errorData);
-        setError('Erreur lors du chargement des commandes');
-        return;
-      }
-
-      const data = await response.json();
-      setOrders(data);
-      setError(null); // Réinitialiser l'erreur si la requête fonctionne
-
-    } catch (error) {
-      console.error('Erreur lors du fetch:', error);
-      setError('Erreur réseau lors du chargement des commandes');
+      setOrders(res.data);
+      setError(null);
+    } catch (err) {
+      console.error('Erreur lors du chargement des commandes:', err);
+      setError('Erreur lors du chargement des commandes');
     }
   };
 
   useEffect(() => {
     fetchOrders();
+
+    if (!socket) return;
+
+    socket.on('newOrderNotification', fetchOrders);
+    socket.on('orderUpdated', fetchOrders);
+    socket.on('orderDeleted', fetchOrders);
+
+    return () => {
+      socket.off('newOrderNotification', fetchOrders);
+      socket.off('orderUpdated', fetchOrders);
+      socket.off('orderDeleted', fetchOrders);
+    };
   }, []);
 
   const filterOrdersByPeriod = (orders: Order[], period: Period): Order[] => {
+    const now = dayjs();
     if (period === 'all') return orders;
 
-    const now = dayjs();
     return orders.filter((order) => {
       const orderDate = dayjs(order.date);
       switch (period) {
@@ -188,3 +183,4 @@ const StatCard = ({ title, color, value }: StatCardProps) => {
 };
 
 export default Orders;
+

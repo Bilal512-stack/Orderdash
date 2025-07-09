@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import api from '../axiosConfig';  // axios configuré avec URL Railway
+import socket from '../hooks/SocketContext';
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -21,6 +22,24 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
     commandes: 0,
   });
 
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset form when modal is closed
+      setFormData({
+        prenom: '',
+        nom: '',
+        email: '',
+        telephone: '',
+        adresse: '',
+        ville: '',
+        role: 'client',
+        status: 'actif',
+        derniereCommande: '',
+        commandes: 0,
+      });
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -32,47 +51,36 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, onUs
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const token = localStorage.getItem('token');
-  if (!token) {
-    alert('Token manquant. Veuillez vous reconnecter.');
-    return;
-  }
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Token manquant. Veuillez vous reconnecter.');
+      return;
+    }
 
-  try {
-    await axios.post('http://localhost:5000/api/users/create-user', {
-      ...formData,
-      dateInscription: new Date().toISOString(),
-      derniereCommande: formData.derniereCommande || null,
-    }, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const payload = {
+        ...formData,
+        dateInscription: new Date().toISOString(),
+        derniereCommande: formData.derniereCommande || null,
+      };
 
-    onUserCreated();
-    onClose();
+      const response = await api.post('/users/create-user', payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    setFormData({
-      prenom: '',
-      nom: '',
-      email: '',
-      telephone: '',
-      adresse: '',
-      ville: '',
-      role: 'client',
-      status: 'actif',
-      derniereCommande: '',
-      commandes: 0,
-    });
-  } catch (error: any) {
-    console.error("❌ Erreur lors de la création de l'utilisateur :", error);
-    alert(error.response?.data?.error || "Erreur lors de la création de l'utilisateur.");
-  }
-};
+      // Optionnel : notifier le dashboard en temps réel si besoin
+      socket.emit('newUserCreated', response.data);
 
-  
+      onUserCreated();
+      onClose();
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la création de l'utilisateur :", error);
+      alert(error.response?.data?.error || "Erreur lors de la création de l'utilisateur.");
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
       <form
