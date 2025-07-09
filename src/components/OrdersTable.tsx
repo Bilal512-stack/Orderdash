@@ -28,7 +28,7 @@ const OrdersTable: React.FC = () => {
     }
 
     try {
-      const response = await api.get('/api/orders', {
+      const response = await api.get('/orders', {
         headers: { Authorization: `Bearer ${token}` },
       });
 

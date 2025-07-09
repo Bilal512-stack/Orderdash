@@ -18,7 +18,7 @@ const Users: React.FC = () => {
         return;
       }
 
-      const response = await api.get<User[]>('/api/users', {
+      const response = await api.get<User[]>('/users', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(response.data);

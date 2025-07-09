@@ -20,6 +20,14 @@ interface Order {
   date: string;
   status: string;
   montant: number;
+  pickup?: {
+    senderName?: string;
+  };
+  delivery?: {
+    recipientName?: string;
+  };
+  createdAt?: string;
+  _id?: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -32,14 +40,14 @@ const Dashboard: React.FC = () => {
     try {
       const [statsRes, ordersRes] = await Promise.all([
         api.get<Stats>('/stats'),
-        api.get<any[]>('/orders'),
+        api.get<Order[]>('/orders'),
       ]);
 
       setStats(statsRes.data);
       setOrders(
         ordersRes.data
           .map((order) => ({
-            id: order._id,
+            id: order._id ?? 'id-inconnu',
             senderName: order.pickup?.senderName || 'Expéditeur inconnu',
             recipientName: order.delivery?.recipientName || 'Destinataire inconnu',
             date: order.createdAt || new Date().toISOString(),
