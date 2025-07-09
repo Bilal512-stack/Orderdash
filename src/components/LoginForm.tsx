@@ -22,7 +22,7 @@ export default function LoginForm() {
       console.log('✅ Token stocké :', token);
 
       // ✅ Redirection vers le dashboard principal (homepage)
-      navigate('/Dashboard');
+      navigate('/');
     } catch (error: any) {
       console.error('❌ Erreur de connexion :', error);
       alert('Email ou mot de passe incorrect.');
