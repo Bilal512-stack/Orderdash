@@ -13,12 +13,14 @@ import './index.css'; // Ou le nom de ton fichier CSS Tailwind
 
 
 function App() {
+  // Log the backend URL before rendering
+  console.log("✅ BACKEND_URL:", process.env.REACT_APP_API_URL);
+
   return (
     <Router>
       <Routes>
         {/* Route publique (login) */}
         <Route path="/login" element={<AdminLogin />} />
-
         {/* Routes protégées */}
         <Route
           path="/*"
