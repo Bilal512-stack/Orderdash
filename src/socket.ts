@@ -1,8 +1,6 @@
 import { io } from 'socket.io-client';
-
-// En prod (Vercel), REACT_APP_API_URL doit être une URL HTTPS valide Railway
 const BACKEND_URL =
-  process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  process.env.REACT_APP_API_URL ||  'https://mta-backend-production-1342.up.railway.app';
 
 const socket = io(BACKEND_URL, {
   transports: ['websocket'],
