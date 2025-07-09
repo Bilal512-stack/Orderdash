@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import api from '../axiosConfig';
-import socket from '../hooks/SocketContext';
+import socket from '../socket';
 
 interface CreateOrderModalProps {
   onClose: () => void;
