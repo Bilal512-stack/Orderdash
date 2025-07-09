@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../axiosConfig';  // axios configuré avec URL Railway
-import socket from '../hooks/SocketContext';
+import socket from '../socket';
 
 interface CreateUserModalProps {
   isOpen: boolean;
