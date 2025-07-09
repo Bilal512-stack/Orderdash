@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+const BACKEND_URL = process.env.REACT_APP_API_URL || 'https://mta-backend-production-1342.up.railway.app';
+console.log("✅ BACKEND_URL:", BACKEND_URL); // 👈 important
+
 const api = axios.create({
-  baseURL: `${process.env.REACT_APP_API_URL}/api`,
+  baseURL: `${BACKEND_URL}/api`,
   withCredentials: true,
 });
 
