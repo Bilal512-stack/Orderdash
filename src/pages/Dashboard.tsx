@@ -37,6 +37,7 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
+    console.log('Token avant fetch:', localStorage.getItem('token'));
     try {
       const [statsRes, ordersRes] = await Promise.all([
         api.get<Stats>('/stats'),
